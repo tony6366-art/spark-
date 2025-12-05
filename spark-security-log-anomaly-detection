@@ -1,0 +1,179 @@
+# spark-
+!pip install -q pyspark==3.5.0
+
+print("JAVA VERSION:")
+!java -version
+from pyspark.sql import SparkSession
+
+spark = (
+    SparkSession.builder
+    .master("local[*]")
+    .appName("SecurityLogAnomalyDetection")
+    .getOrCreate()
+)
+
+spark
+import pandas as pd
+import random
+from datetime import datetime, timedelta
+
+def generate_logs(n=5000):
+    logs = []
+    base = datetime.now()
+
+    for i in range(n):
+        timestamp = base - timedelta(minutes=i)
+        logs.append([
+            timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),         # timestamp
+            f"10.0.0.{random.randint(1, 254)}",               # src_ip
+            f"192.168.0.{random.randint(1, 254)}",            # dst_ip
+            random.randint(1000, 65535),                      # src_port
+            random.choice([80, 80, 80, 443, 443, 8080]),      # dst_port (조금 치우치게)
+            random.choice(["TCP", "TCP", "TCP", "UDP"]),      # protocol (TCP 위주)
+            random.choice(["ALLOW", "ALLOW", "DENY"]),        # action (ALLOW 위주)
+            random.randint(0, 50000),                         # bytes
+            random.choice([200, 200, 200, 400, 404, 500])     # resp_code
+        ])
+
+    df = pd.DataFrame(logs, columns=[
+        "timestamp", "src_ip", "dst_ip",
+        "src_port", "dst_port", "protocol",
+        "action", "bytes", "resp_code"
+    ])
+    df.to_csv("/content/security_logs.csv", index=False)
+
+generate_logs(5000)
+print("✅ /content/security_logs.csv 생성 완료")
+from pyspark.sql.functions import col, unix_timestamp, hour, dayofweek
+from pyspark.sql.types import (
+    StructType, StructField, StringType,
+    IntegerType, LongType
+)
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import (
+    StringIndexer, OneHotEncoder, VectorAssembler, StandardScaler
+)
+
+def get_log_schema():
+    return StructType([
+        StructField("timestamp", StringType(), True),
+        StructField("src_ip", StringType(), True),
+        StructField("dst_ip", StringType(), True),
+        StructField("src_port", IntegerType(), True),
+        StructField("dst_port", IntegerType(), True),
+        StructField("protocol", StringType(), True),
+        StructField("action", StringType(), True),
+        StructField("bytes", LongType(), True),
+        StructField("resp_code", IntegerType(), True),
+    ])
+
+def build_preprocess_pipeline():
+    cat_cols = ["protocol", "action"]
+    num_cols = ["src_port", "dst_port", "bytes", "resp_code", "hour", "day_of_week"]
+
+    indexers = [
+        StringIndexer(inputCol=c, outputCol=f"{c}_idx", handleInvalid="keep")
+        for c in cat_cols
+    ]
+    encoders = [
+        OneHotEncoder(inputCol=f"{c}_idx", outputCol=f"{c}_ohe")
+        for c in cat_cols
+    ]
+
+    feature_cols = [f"{c}_ohe" for c in cat_cols] + num_cols
+
+    assembler = VectorAssembler(
+        inputCols=feature_cols,
+        outputCol="features_raw"
+    )
+
+    scaler = StandardScaler(
+        inputCol="features_raw",
+        outputCol="features",
+        withStd=True,
+        withMean=True
+    )
+
+    return Pipeline(stages=indexers + encoders + [assembler, scaler])
+schema = get_log_schema()
+
+df = (
+    spark.read
+    .option("header", True)
+    .schema(schema)
+    .csv("/content/security_logs.csv")
+)
+
+print("원본 로그 수:", df.count())
+df.show(5, truncate=False)
+
+# timestamp → 시간 파생 변수
+df = df.withColumn(
+    "ts_parsed",
+    unix_timestamp(col("timestamp"), "yyyy-MM-dd'T'HH:mm:ss'Z'").cast("timestamp")
+)
+df = df.withColumn("hour", hour(col("ts_parsed")))
+df = df.withColumn("day_of_week", dayofweek(col("ts_parsed")))
+
+# 결측치 방어 (VectorAssembler null 방지)
+df = df.fillna({
+    "bytes": 0,
+    "resp_code": 200,
+    "src_port": 0,
+    "dst_port": 0,
+    "hour": 0,
+    "day_of_week": 1
+})
+
+pipe = build_preprocess_pipeline()
+preprocess_model = pipe.fit(df)
+processed = preprocess_model.transform(df)
+
+print("✅ 전처리 완료 (features 예시)")
+processed.select("features").show(5, truncate=False)
+from pyspark.ml.clustering import KMeans
+from pyspark.sql.functions import udf
+from pyspark.sql.types import DoubleType
+
+# KMeans 학습
+kmeans = KMeans(
+    k=10,
+    seed=42,
+    featuresCol="features",
+    predictionCol="cluster"
+)
+k_model = kmeans.fit(processed)
+
+# 클러스터 중심 broadcast
+centers = k_model.clusterCenters()
+bc_centers = spark.sparkContext.broadcast(centers)
+
+def squared_distance(v, cidx):
+    center = bc_centers.value[int(cidx)]
+    return float(sum((v[i] - center[i])**2 for i in range(len(center))))
+
+dist_udf = udf(squared_distance, DoubleType())
+
+pred = k_model.transform(processed)
+pred = pred.withColumn("distance", dist_udf(col("features"), col("cluster")))
+
+print("✅ distance 포함된 예시")
+pred.select("timestamp", "src_ip", "action", "bytes", "cluster", "distance").show(10, truncate=False)
+from pyspark.sql.functions import col
+
+quantile = 0.99
+threshold = pred.approxQuantile("distance", [quantile], 0.01)[0]
+print(f"distance 상위 {int(quantile*100)}% 기준 threshold:", threshold)
+
+anomalies = pred.filter(col("distance") > threshold)
+print("이상 로그 개수:", anomalies.count())
+
+anomalies.select(
+    "timestamp", "src_ip", "dst_ip",
+    "src_port", "dst_port", "protocol",
+    "action", "bytes", "resp_code",
+    "cluster", "distance"
+).orderBy(col("distance").desc()).show(30, truncate=False)
+preprocess_model.write().overwrite().save("/content/preprocess_model")
+k_model.write().overwrite().save("/content/kmeans_model")
+print("✅ 모델 저장 완료")
