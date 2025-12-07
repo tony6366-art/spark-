@@ -1,95 +1,13 @@
-Big Data Processing + Cyber Security Fusion Project
-(Korea University Information Security Graduate School Portfolio)
-📘 프로젝트 개요 (Overview)
-이 프로젝트는 Apache Spark를 기반으로 대규모 보안 로그(Security Logs)를 처리하고,
-비지도 학습 기반(K-Means) 이상 탐지(Anomaly Detection) 기법을 활용하여
-비정상적인 네트워크 트래픽 패턴을 탐지하는 시스템을 구현한 것입니다.
-이 프로젝트는 다음 두 분야를 융합하는 것을 목표로 합니다:
-빅데이터 프로세싱(Big Data Processing)
-사이버 보안(Security Log Analytics)
-실제 방화벽/웹 서버 로그 구조를 모방한 데이터셋을 생성한 뒤,
-Spark ML 파이프라인으로 전처리 → 특징 추출 → 클러스터링 → 이상치 선별까지 전체 흐름을 구현했습니다.
-🔍 주요 기능 (Key Features)
-✔ 1. Synthetic Security Log Generator
-실제 보안 로그 형태(src_ip, dst_ip, port, protocol, action, bytes, resp_code)를 기반으로
-5,000건 이상의 로그 데이터를 자동 생성합니다.
-✔ 2. Spark 기반 분산 전처리 파이프라인
-카테고리 변수 인코딩 (StringIndexer + OneHotEncoder)
-시간 파생 변수 생성 (hour, day_of_week)
-수치 스케일링(StandardScaler)
-VectorAssembler 기반 feature 벡터 구성
-Spark ML Pipeline으로 일관적 처리
-✔ 3. 비지도 학습 기반 이상 탐지
-KMeans(k=10) 클러스터링
-각 로그 → 클러스터 중심점 거리 계산
-상위 1% distance = anomaly
-(운영 환경에서 임계값을 조정해도 유연하게 적용 가능)
-✔ 4. 모델 저장 및 재사용
-/content/preprocess_model
-/content/kmeans_model
-Spark MLlib 포맷으로 저장되어 재사용 가능.
-🧪 공격 시나리오(Anomaly Scenario) (선택/추가 시 더 고급 프로젝트가 됨)
-본 프로젝트에는 다음과 같은 공격 패턴을 시뮬레이션하여 포함할 수 있습니다:
-공격 유형	설명
-Port Scanning	특정 IP가 매우 많은 포트로 지속적으로 연결 시도
-Data Exfiltration	비정상적으로 큰 bytes 전송 발생
-Web Attack Attempt	404, 500 등 오류 응답 코드가 짧은 시간 동안 집중 발생
-KMeans 기반 anomaly ranking이 실제 공격 시나리오를 상위 순위에서 탐지한 것을 통해
-모델의 유효성을 평가합니다.
-🏗 프로젝트 구조 (Project Structure)
-📁 Spark-Security-Anomaly-Detection
-│
-├── src/
-│   ├── preprocess.py
-│   ├── train_kmeans.py
-│   └── detect_anomaly.py
-│
-├── data/
-│   └── security_logs.csv
-│
-├── models/
-│   ├── preprocess_model/
-│   └── kmeans_model/
-│
-├── notebooks/
-│   └── anomaly_detection_colab.ipynb
-│
-└── README.md
-📊 결과 예시 (Detection Results)
-✔ Distance 기반 이상치 탐지 결과 (Top 1%)
-timestamp                  src_ip    action   bytes   cluster   distance
-2025-01-05T13:34:12Z       10.0.0.8  DENY     48739       7      92.184
-2025-01-05T13:33:12Z       10.0.0.8  DENY     49211       7      91.002
-2025-01-05T13:32:12Z       10.0.0.8  TCP      50120       7      89.553
-...
-✔ 공격 시나리오 탐지율 예시
-Top 100 anomalies 중 81개가 공격 시뮬레이션 IP
-→ 비지도 학습 기반이라도 상당한 탐지율을 보였음을 시사
-🧠 기술 스택 (Tech Stack)
-Language: Python
-Framework: Apache Spark (3.5.0)
-ML: Spark MLlib (KMeans)
-Data Handling: PySpark SQL, Pandas
-Environment: Google Colab / Jupyter Notebook
-🎯 본 프로젝트의 의의 (Why This Project Matters)
-✔ 보안 도메인 + 빅데이터 기술 융합
-대규모 보안 로그 분석은 실제 대기업/공공기관에서 매우 중요한 과제입니다.
-Spark 기반 이상 탐지 모델은 라벨링되지 않은 방대한 보안 로그에서도
-효율적으로 비정상 행위를 탐지할 수 있는 강력한 접근 방식입니다.
-✔ 고려대 정보보호대학원 포트폴리오 적합성
-공격 시나리오 기반 로그 구성
-데이터 엔지니어링 + 머신러닝 + 보안 도메인 이해
-실제 서비스 가능한 수준의 파이프라인 구성
-이 세 요소가 잘 결합되어 있어, 지원 과정에서 강한 인상을 줄 수 있음.
-🚀 향후 개선 방향 (Future Work)
-Isolation Forest, LOF 등 다른 anomaly 모델 비교
-Spark Streaming 기반 실시간 보안 로그 처리
-CIC-IDS2017 / UNSW-NB15 같은 공개 데이터셋 적용
-그래프 기반 공격 탐지(Graph Analytics)로 확장
-📄 라이선스 (License)
-MIT License
-🙋‍♂️ Author
-Chae Youho (채윤호)
-AI Software & Big Data Processing
-Contact: (optional)
-GitHub: (your link here)
+# Spark 기반 보안 로그 이상 탐지
+
+이 저장소는 Apache Spark를 이용해서 보안 로그에서 이상 징후를 찾아내는 실험 프로젝트입니다. 실제 서비스 로그를 그대로 쓰기보다는, 먼저 방화벽·웹서버 로그와 비슷한 형태의 데이터를 직접 만들어 내고, 그 데이터를 Spark ML 파이프라인에 태워서 “정상 패턴과 거리가 먼 이벤트”를 골라내는 흐름을 구현했습니다. 한 줄로 요약하면, **보안 로그를 빅데이터 엔진 위에서 다루면서 비지도 학습 기반 이상 탐지를 끝까지 한 번 구현해 본 코드**입니다.
+
+로그 생성 단계에서는 `generate_logs()` 함수로 `timestamp, src_ip, dst_ip, src_port, dst_port, protocol, action, bytes, resp_code` 같은 필드를 가진 CSV를 만듭니다. 내부 IP 대역(예: `10.0.0.x`)에서 외부 IP로 나가는 트래픽을 흉내 내고, 웹/SSH/DB 포트 쪽으로 약간 편향을 줘서 “조금은 수상한 움직임이 섞여 있는 트래픽”이 되도록 구성했습니다. 이 데이터는 기본적으로 `/content/security_logs.csv`로 떨어지게 되어 있고, Colab 환경에서 바로 다음 단계로 이어서 사용할 수 있습니다.
+
+Spark 쪽에서는 먼저 명시적인 스키마를 정의한 뒤, 생성한 CSV를 DataFrame으로 읽어 옵니다. `timestamp` 컬럼은 Spark의 `timestamp` 타입으로 파싱해서 `hour`, `day_of_week` 같은 시간 파생 변수를 추가로 만들고, 이후 특징(feature)로 활용합니다. 범주형 변수인 `protocol`과 `action`은 `StringIndexer`와 `OneHotEncoder`로 숫자 벡터로 바꾸고, 포트, 바이트 수, 응답 코드, 시간 정보 등과 함께 `VectorAssembler`로 하나의 feature 벡터로 묶습니다. 마지막으로 `StandardScaler`로 평균 0, 분산 1 기준으로 스케일링해서 K-Means가 잘 수렴하도록 했습니다. 이 전처리 과정은 하나의 `Pipeline`으로 묶어 두어서, 나중에 새로운 로그에도 같은 방식으로 쉽게 적용할 수 있습니다.
+
+이상 탐지 자체는 Spark MLlib의 `KMeans`를 사용합니다. 클러스터 개수 `k=10`을 주고 학습을 돌리면, 각 로그는 어느 클러스터에 속하는지(`cluster`)와 변환된 feature 벡터를 갖게 됩니다. 여기서 한 번 더, 각 포인트가 속한 클러스터 중심으로부터 얼마나 떨어져 있는지 제곱거리(`distance`)를 직접 계산해서 컬럼으로 추가했습니다. 직관적으로, 클러스터 중심에서 멀리 떨어진 로그일수록 “평소 패턴과 다른 행동을 한 이벤트”로 볼 수 있기 때문에 이상치 후보가 됩니다.
+
+마지막 단계에서는 이 distance 값을 기준으로 상위 1% 구간에 해당하는 임계값을 `approxQuantile`로 구하고, 그 기준을 넘는 로그만 필터링해서 이상 로그로 간주합니다. 이렇게 걸러진 레코드는 타임스탬프, IP 정보, 포트, 프로토콜, 액션, 응답 코드, 클러스터 번호와 거리까지 함께 출력해서, “어떤 요청이 왜 수상해 보이는지”를 눈으로 바로 확인할 수 있게 했습니다. 학습에 사용된 전처리 파이프라인과 K-Means 모델은 `/content/preprocess_model`, `/content/kmeans_model` 경로에 저장하도록 해 두었기 때문에, 추후에 스트리밍 파이프라인이나 다른 로그 샘플에 그대로 재사용하는 것도 염두에 두고 설계했습니다.
+
+개발·실행 환경은 Google Colab을 기준으로 했고, `pyspark==3.5.0` 버전을 사용했습니다. 노트북 상단에서 PySpark를 설치하고 SparkSession만 생성해 주면 나머지 코드는 그대로 실행되도록 구성해 두었습니다. 전체적으로는 “보안 로그를 데이터로 보고, Spark를 이용해 전처리 → 특징 추출 → 비지도 학습 → 이상치 스코어링까지 한 번에 흐름을 만든 프로젝트”로, 이후에 Threat Intelligence 연동, Kafka 스트림 처리, ELK 대시보드 같은 요소를 더 얹어서 확장할 수 있는 기반이 됩니다.
